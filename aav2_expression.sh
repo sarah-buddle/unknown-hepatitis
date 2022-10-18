@@ -3,6 +3,9 @@ results=/path/to/results/directory
 tissue= # blood or liver
 dnarna= # DNA or RNA
 sample= # sample name
+bowtie=/share/apps/genomics/bowtie2-2.4.1/bowtie2
+samtools=/share/apps/genomics/samtools-1.9/bin/samtools
+picard=/share/apps/genomics/picard-2.26.9/picard.jar
 
 #### AAV2 expression ####
 
@@ -37,3 +40,20 @@ java -Xmx4g -jar ${picard}  BuildBamIndex I=${results}/${tissue}/${sample}/${dna
 # Make depth files for import into R
 ${samtools} depth ${results}/${tissue}/${sample}/${dnarna}/bam/${sample}_aav2_sorted_dedup.bam \
 > ${results}/${tissue}/${sample}/${dnarna}/bam/${sample}_${dnarna}_aav2_sorted_dedup.depth
+
+#### Transcript assembly ####
+ mkdir ${results}/star/${tissue}/${sample}/${dnarna}/ ${results}/stringtie/${tissue}/${sample}/${dnarna}/
+
+${star} --genomeDir ${genome_dir} \
+--runThreadN 6 \
+--runMode alignReads \
+--readFilesIn ${results}/${tissue}/${sample}/${dnarna}/aav_mapped_fastq/${tissue}_${sample}_${dnarna}_1.fastq \
+${results}/${tissue}/${sample}/${dnarna}/aav_mapped_fastq/${tissue}_${sample}_${dnarna}_2.fastq \
+--outFileNamePrefix ${results}/star/${tissue}/${sample}/${dnarna}/ \
+--outSAMtype BAM SortedByCoordinate \
+--outSAMunmapped Within \
+--outSAMattributes Standard
+
+${stringtie} -o ${results}/stringtie/${tissue}/${sample}/${dnarna}/${tissue}_${sample}_${dnarna}_aav2.gtf \
+-s 1 ${results}/star/${tissue}/${sample}/${dnarna}/Aligned.sortedByCoord.out.bam
+
