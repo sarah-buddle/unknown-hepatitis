@@ -33,7 +33,6 @@ pcr_pos <- Vectorize(pcr_pos, vectorize.args = "ct")
 
 #### Import and prepare data ####
 data_kings <- read.csv("pcr_data2.csv") %>%
-  #select(-c(X,X.1,X.2)) %>% 
   
   # Set negative PCR results to an arbitrary value above the 
   # max number of CT cycles for plotting
@@ -51,24 +50,25 @@ data_kings <- read.csv("pcr_data2.csv") %>%
          adeno_pcr = pcr_pos(ct = adeno_ct, thres = thres, not_detected = not_detected),
          hhv6_pcr = pcr_pos(ct = hhv6_ct, thres = thres, not_detected = not_detected)) %>% 
   
-  # Filter to aged under 6 for blood controls
+  # Filter by age for blood controls
         dplyr::filter(!(group == "control" & tissue == "blood" & age >= age_threshold)) %>% 
   
-  # Remove groups with only 1 member
+  # Remove blood control groups with only 1 member
        group_by(control_type) %>% 
        filter(n_distinct(anon_id) >= 3 | tissue != "blood") %>% 
        ungroup() #%>% 
   
+  # Filter for where we have tested for all three viruses
   #dplyr::filter(!(is.na(aav2_pcr) & is.na(adeno_pcr) & is.na(hhv6_pcr)))
 
 #write_csv(data_kings, "pcr_data_counts.csv")
 
-# Just the non FFPE data for stats
+# Remove FFPE and plasma data since it's not comparable with the rest
 data <- data_kings %>% 
   dplyr::filter(source != "kings") %>% 
  dplyr::filter(!is.na(aav2_pcr) & !is.na(adeno_pcr) & !is.na(hhv6_pcr))
 
-# Labels and levels
+# Labels and levels for plotting
 control_types_aav2 <- c("case", "case_ffpe_t", "case_ffpe_nt", "case_p_t", "case_p_nt",
                         "Case", "control_liver", "control_stool", "non_infectious",
                         "Adenovirus with normal ALT",
@@ -132,9 +132,11 @@ aav2_blood <- data %>%
   filter(n_distinct(anon_id) >= 3) %>% 
   ungroup()
 
+# cases and gosh controls
 aav2_blood_gosh <- aav2_blood %>% 
   dplyr::filter(!(source %in% c("PERFORM", "DIAMONDS"))) 
 
+# cases and PERFORM/DIAMONDS controls
 aav2_blood_pd <- aav2_blood %>% 
   dplyr::filter(group == "case" | source %in% c("PERFORM", "DIAMONDS"))
 
@@ -146,22 +148,6 @@ wilcox.test(aav2_ct_inv ~ group, aav2_blood_pd)
 # Cases vs individual groups of controls
 kruskal.test(aav2_ct_inv ~ control_type, aav2_blood)
 pairwise.wilcox.test(aav2_blood$aav2_ct_inv, aav2_blood$control_type, 
-                     p.adjust.method = "BH")
-
-# Treating all HAdV groups in DIAMONDS/PERFORM as single group
-pd_HAdV_control_groups <- c("HAdV (elsewhere), normal ALT", 
-                           "HAdV (blood), normal ALT", 
-                           "HAdV, raised ALT (D/P)", 
-                           "HAdV CovidMisC, normal ALT")
-
-aav2_HAdV_group <- aav2_blood %>% 
-  dplyr::mutate(control_type = as.character(control_type)) %>% 
-  dplyr::mutate(control_type = ifelse(control_type %in% pd_HAdV_control_groups, 
-                               "HAdV_group", control_type))
-
-kruskal.test(aav2_ct_inv ~ control_type, aav2_HAdV_group)
-pairwise.wilcox.test(aav2_HAdV_group$aav2_ct_inv, 
-                     aav2_HAdV_group$control_type, 
                      p.adjust.method = "BH")
 
 
@@ -203,7 +189,7 @@ kruskal.test(hhv6_ct_inv ~ control_type, hhv6_blood)
 pairwise.wilcox.test(hhv6_blood$hhv6_ct_inv, hhv6_blood$control_type, 
                      p.adjust.method = "BH")
 
-# Fisher's exact tests
+# Fisher's exact tests for AAV2 and HHV6
 # AAV2 
 aav2_pd_fisher <- aav2_blood_pd %>% 
   tabyl(group, aav2_pcr) %>% 
@@ -231,16 +217,6 @@ hhv6_fisher <- data %>%
 fisher.test(hhv6_fisher)
 
 #### CT Plots ####
-
-liver_kings <- data_kings %>%
-  filter(tissue %in% c("liver", "liver_ffpe")) %>% 
-  dplyr::select(c(control_type, adeno_ct_inv, aav2_ct_inv, hhv6_ct_inv)) %>% 
-  tidyr::pivot_longer(!control_type, names_to = "virus", values_to = "ct_inv") %>% 
-  dplyr::mutate(virus = sub("_ct_inv", "", virus)) %>% 
-  dplyr::mutate(virus = factor(virus, levels = c("aav2", "adeno", "hhv6"), 
-                               labels = c("AAV2", "HAdV", "HHV6")),
-                control_type = factor(control_type, levels = c("Case", "Control", "case_ffpe_t", "case_ffpe_nt"), 
-                               labels = c("Case (tr)", "Comparator", "Case (FFPE, tr)", "Case (FFPE, no tr)")))
 
 # Liver
 all_liver_sig <- ggplot2::ggplot(data=liver, aes(x=factor(group), y=ct_inv)) +
@@ -294,14 +270,6 @@ ggdraw(all_liver_plot) + draw_plot(all_liver_sig)
 dev.off()
 
 # AAV2 in blood - cases and GOSH controls
-aav2_blood_kings <- data_kings %>% 
-  dplyr::filter(tissue %in% c("blood", "plasma_kings") & !is.na(aav2_ct)) %>%  
-  dplyr::select(c(anon_id, group, control_type, aav2_ct, aav2_ct_inv, source)) %>% 
-  dplyr::mutate(control_type = factor(control_type, levels = control_types_aav2,
-                                      labels = control_types_aav2_labels)) %>% 
-  group_by(control_type) %>% 
-  filter(n_distinct(anon_id) >= 3) %>% 
-  ungroup()
 
 aav2_blood_plot <- ggplot2::ggplot(data=aav2_blood, aes(x=factor(control_type), y=aav2_ct_inv)) +
   geom_boxplot(width = 0.3, outlier.shape = NA, show.legend = FALSE) +
@@ -322,26 +290,14 @@ aav2_blood_plot <- ggplot2::ggplot(data=aav2_blood, aes(x=factor(control_type), 
   geom_hline(yintercept = 1/not_detected, linetype = "dashed") +
   ggpubr::stat_compare_means(method = "wilcox.test", label = "p.signif", ref.group = "Case",
                              label.y = 1/17, size = 6,
+                             # thresholds adjusted manually since the package doesn't incorporate multiple hypothesis correction
                              symnum.args = list(cutpoints = c(0, 0.00007, 0.001, 0.02, 1), 
                                                 symbols = c("***", "**", "*", "NS"))) +
   scale_y_continuous(breaks = c(1/50, 1/40, 1/35, 1/30, 1/25, 1/20, 1/15), 
                      labels = c("ND", "1/40", "1/35", "1/30", "1/25", "1/20", "1/15"),
-                     limits=c(1/51, 1/14)) #+
-  # annotate("rect", xmin = 1, xmax = 3.5, ymin = 1/15, ymax = 1/17.5,
-  #          alpha = 1, fill = "white")
-
-aav2_blood_plot
+                     limits=c(1/51, 1/14)) 
 
 # AdV in blood
-adeno_blood_kings <- data_kings %>% 
-  dplyr::filter(tissue %in% c("blood", "plasma_kings") & !is.na(adeno_ct)) %>%  
-  dplyr::select(c(anon_id, group, control_type, adeno_ct, adeno_ct_inv, source)) %>% 
-  dplyr::mutate(control_type = factor(control_type, levels = control_types,
-                                      labels = control_types_labels)) %>% 
-  group_by(control_type) %>% 
-  filter(n_distinct(anon_id) >= 3) %>% 
-  ungroup()
-
 
 adeno_blood_plot <- ggplot2::ggplot(data=adeno_blood, aes(x=factor(control_type), y=adeno_ct_inv)) +
   geom_boxplot(width = 0.3, outlier.shape = NA, show.legend = FALSE) +
@@ -368,20 +324,10 @@ adeno_blood_plot <- ggplot2::ggplot(data=adeno_blood, aes(x=factor(control_type)
                      label.y = 1/17, size = 6,
                      # thresholds adjusted manually since the package doesn't incorporate multiple hypothesis correction
                      symnum.args = list(cutpoints = c(0, 0.001, 0.01, 0.05, 1), 
-                                         symbols = c("***", "**", "*", "NS"))) #+
-  # annotate("rect", xmin = 1, xmax = 3.5, ymin = 1/15, ymax = 1/17.5,
-  #          alpha = 1, fill = "white")
+                                         symbols = c("***", "**", "*", "NS")))
 
 
 #HHV6
-hhv6_blood_kings <- data_kings %>% 
-  dplyr::filter(tissue %in% c("blood", "plasma_kings") & !is.na(hhv6_ct)) %>%  
-  dplyr::select(c(anon_id, group, control_type, hhv6_ct, hhv6_ct_inv, source)) %>% 
-  dplyr::mutate(control_type = factor(control_type, levels = control_types,
-                                      labels = control_types_labels)) %>% 
-  group_by(control_type) %>% 
-  filter(n_distinct(anon_id) >= 3) %>% 
-  ungroup()
 
 hhv6_blood_plot <- ggplot2::ggplot(data=hhv6_blood, aes(x=factor(control_type), y=hhv6_ct_inv)) +
   geom_boxplot(width = 0.3, outlier.shape = NA, show.legend = FALSE) +
@@ -406,13 +352,9 @@ hhv6_blood_plot <- ggplot2::ggplot(data=hhv6_blood, aes(x=factor(control_type), 
                      limits=c(1/51, 1/14)) +
   stat_compare_means(method = "wilcox.test", label = "p.signif", ref.group = "Case",
                      label.y = 1/17, size = 6,
+                     # thresholds adjusted manually since the package doesn't incorporate multiple hypothesis correction
                      symnum.args = list(cutpoints = c(0, 0.0001, 0.002, 0.01, 1),
-                                        symbols = c("***", "**", "*", "NS"))) #+
-  # annotate("rect", xmin = 1, xmax = 3.5, ymin = 1/15, ymax = 1/17.5,
-  #          alpha = 1, fill = "white")
-
-hhv6_blood_plot
-
+                                        symbols = c("***", "**", "*", "NS")))
 
 png("Figures/aav2_blood.png", units="in", width=10, height=5, res=300)
 aav2_blood_plot
@@ -565,113 +507,4 @@ pcr_results_hhv6 <- ggplot2::ggplot(data = bar_hhv6, aes(x = group, count, fill 
 png("Figures/pcr_results_hhv6.png", units="in", width=3.5, height=4, res=300)
 pcr_results_hhv6
 dev.off()
-
-# Calculations for text
-data_pd <- data_kings %>% 
-  filter(source %in% c("DIAMONDS", "PERFORM"))
-
-data_gosh <- data_kings %>% 
-  filter(source == "GOSH" & tissue == "blood")
-median(data_gosh$age)
-
-median(data_pd$age)
-
-table3 <- data_kings %>% 
-  dplyr::filter(group == "control" & source == "GOSH") %>% 
-  tabyl(control_type)
-
-table4 <- tabyl(data_pd, source, control_type)
-
-age_group <- function(age) {
-  
-  if(age < 2){
-    return ("0-1")
-    
-  } else if(age < 4){
-    return("'2-3")
-    
-  } else if(age < 6){
-    return("'4-5")
-    
-  } else if(age < 8){
-    return("'6-7")
-    
-  } else {
-    return(NA)
-  }
-}
-
-age_group <- Vectorize(age_group, vectorize.args = "age")
-
-table5 <- data_kings %>% 
-  filter(!is.na(age) & tissue == "blood") %>% 
-  mutate(age_group = age_group(age)) %>% 
-  select(c(source, age_group)) %>% 
-  tabyl(age_group, source)
-
-
-# # AAV2 in blood - cases and GOSH controls
-# aav2_blood_gosh_plot <- ggplot2::ggplot(data=aav2_blood_gosh, aes(x=factor(control_type), y=aav2_ct_inv)) +
-#   geom_boxplot(width = 0.3, outlier.shape = NA, show.legend = FALSE) +
-#   geom_point(position=position_jitter(w=0.2, h=0), shape = 16, alpha = 0.8, size = 2) +
-#   theme_light() +
-#   theme(axis.title.x = element_blank(),
-#         axis.text.x = element_text(size = 16, angle = 45, hjust = 1),
-#         axis.title.y = element_text(angle = 0, size=18),
-#         axis.text.y = element_text(size = 16),
-#         panel.grid.major = element_blank(),
-#         panel.grid.minor = element_blank(),
-#         panel.border=element_blank(),
-#         axis.line = element_line(),
-#         axis.ticks.y = element_line(color = "black")) +
-#   ylab("1/Ct") +
-#   geom_hline(yintercept = 1/thres, linetype = "dashed") +
-#   annotate("text", x = 0.7, y = 1/thres + 0.002, label = "LLP", size = 5) +
-#   geom_hline(yintercept = 1/not_detected, linetype = "dashed") +
-#   ggpubr::stat_compare_means(method = "wilcox.test", label = "p.signif", ref.group = "Case",
-#                              label.y = 1/17, size = 6,
-#                              symnum.args = list(cutpoints = c(0, 0.0001, 0.0025, 0.02, 1), 
-#                                                 symbols = c("***", "**", "*", "NS"))) +
-#   scale_y_continuous(breaks = c(1/50, 1/40, 1/35, 1/30, 1/25, 1/20, 1/15), 
-#                      labels = c("ND", "1/40", "1/35", "1/30", "1/25", "1/20", "1/15"),
-#                      limits=c(1/51, 1/14))
-# 
-# png("Figures/aav2_blood_gosh.png", units="in", width=9, height=5, res=300)
-# aav2_blood_gosh_plot
-# dev.off()
-# 
-# # AAV2 in blood and PERFORM/DIAMONDS controls
-# aav2_blood_plot_pd <- ggplot2::ggplot(data=aav2_blood_pd, aes(x=factor(control_type), y=aav2_ct_inv)) +
-#   geom_boxplot(width = 0.3, outlier.shape = NA, show.legend = FALSE) +
-#   geom_point(position=position_jitter(w=0.2, h=0),
-#              shape = 16, alpha = 0.8, size = 2) +
-#   theme_light() +
-#   theme(axis.title.x = element_blank(),
-#         axis.text.x = element_text(size = 16, angle = 45, hjust = 1),
-#         axis.title.y = element_text(angle = 0, size=18),
-#         axis.text.y = element_text(size = 16),
-#         panel.grid.major = element_blank(),
-#         panel.grid.minor = element_blank(),
-#         panel.border=element_blank(),
-#         axis.line = element_line(),
-#         axis.ticks.y = element_line(color = "black")) +
-#   ylab("1/Ct") +
-#   geom_hline(yintercept = 1/thres, linetype = "dashed") +
-#   annotate("text", x = 0.7, y = 1/thres + 0.002, label = "LLP", size = 5) +
-#   geom_hline(yintercept = 1/not_detected, linetype = "dashed") +
-#   ggpubr::stat_compare_means(method = "wilcox.test", label = "p.signif", ref.group = "Case",
-#                              label.y = 1/17, size = 6, 
-#                              symnum.args = list(cutpoints = c(0, 0.0001, 0.001, 0.01, 1), 
-#                                                 symbols = c("***", "**", "*", "NS"))) +
-#   scale_y_continuous(breaks = c(1/50, 1/40, 1/35, 1/30, 1/25, 1/20, 1/15), 
-#                      labels = c("ND", "1/40", "1/35", "1/30", "1/25", "1/20", "1/15"),
-#                      limits=c(1/51, 1/14))
-# 
-# png("Figures/aav2_blood_pd.png", units="in", width=9, height=6, res=300)
-# aav2_blood_plot_pd
-# dev.off()
-# 
-# 
-# 
-
   
