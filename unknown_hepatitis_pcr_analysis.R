@@ -32,7 +32,7 @@ pcr_pos <- function(ct, thres, not_detected) {
 pcr_pos <- Vectorize(pcr_pos, vectorize.args = "ct")
 
 #### Import and prepare data ####
-data_kings <- read.csv("pcr_data2.csv") %>%
+data_kings <- read.csv("pcr_data3.csv") %>%
   
   # Set negative PCR results to an arbitrary value above the 
   # max number of CT cycles for plotting
