@@ -1,17 +1,17 @@
 ############ Analyssi of Nanopore data ############
 
 ### Add paths to data and software
-data=
-btru=
-minimap2=
-aav2_rc=
-human_genome=
-results=
-samtools=
+data=/path/to/data
+minimap2=/path/to/minimap
+aav2_genome=/path/to/aav2/reference
+aav2_rc=/path/to/aav2/reference/and/reverse/complement
+human_genome=/path/to/human/genome
+results=/path/to/results
+samtools=path/to/samtools
 
 sample=samplename
 
-mkdir -p ${results}/${sample}/aav2_reads
+mkdir -p ${results}/${sample}/aav2_reads/plots
 
 ############ Map raw reads to AAV2 genome ############
 
@@ -124,10 +124,9 @@ done < ${results}/${sample}/aav2_reads/length_sorted.txt
 
 echo N50 $N50 >> ${results}/${sample}/aav2_reads/stats.txt
 
-### Make dot plots (local machine)
-mkdir plots
-for file in *.fasta; do
+### Make dot plots
+for file in ${results}/${sample}/aav2_reads*.fasta; do
   redotable --window 20 ${file} \
-  ~/mnt/BTRU-scratch/sarah/data/hepatitis_preprocessed/genomes/NC_001401.fasta \
-  plots/${file}_redotable.png
+  ${aav2_genome} \
+  ${results}/${sample}/aav2_reads/plots/${file}_redotable.png
 done
