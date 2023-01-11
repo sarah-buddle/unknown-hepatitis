@@ -1,41 +1,32 @@
 library(tidyverse)
 library(lubridate)
 
+# Read in data for adenovirus cases over time
 specimens <- read.csv("epidemiology.csv") %>% 
   separate(week, into = c("year", "week"), sep = 4) %>% 
   mutate(week = as.integer(week)) %>% 
   mutate(year = as.integer(year))
 
-# dates <- read.csv("presentation_dates.csv") %>% 
-#   mutate(week = str_pad(X2022_week, 2, pad = "0")) %>% 
-#   mutate(week = as.integer(paste0("2022", week))) %>% 
-#   mutate(count = 1) %>% 
-#   group_by(week) %>% 
-#   summarise(sum(count)) %>% 
-#   rename(cases = 'sum(count)')
-
-
+# Read in dates of presentation for cases
 dates <- read.csv("presentation_dates.csv") %>%
   select(-date) %>% 
   rename(week = X2022_week) %>% 
   mutate(year = 2022) %>% 
-  #mutate(count = 1) %>% 
-  #group_by(year, week) %>% 
-  #summarise(sum(count)) %>% 
-  #rename(cases = 'sum(count)') %>% 
   mutate(year = as.integer(year))
 
+# Random heights to display the presentation dates to avoid crowding
 numbers <- seq(1, 21)
 randomized_numbers <- sample(numbers)
 dates$random_id <- randomized_numbers
 
+# Join together
 epidemiology <- full_join(specimens, dates, by = c("year", "week")) %>% 
   mutate(x = make_date(year)) %>% 
-  mutate(date = x + lubridate::weeks(week-1)) %>% 
+  mutate(date = x + lubridate::weeks(week-1)) %>%
   mutate(transplant = factor(transplant, levels = c("Transplant", "No transplant"), 
                                  labels = c("Transplant", "No transplant")))
 
-
+# Plot
 plot <- ggplot(epidemiology, aes(x = date)) +
   geom_line(aes(y = number_of_specimens)) +
   geom_point(aes(y = random_id*5 + 100, color = transplant), size = 2) +

@@ -3,9 +3,9 @@ results=/path/to/results/directory
 tissue= # blood or liver
 dnarna= # DNA or RNA
 sample= # sample name
-bowtie=/share/apps/genomics/bowtie2-2.4.1/bowtie2
-samtools=/share/apps/genomics/samtools-1.9/bin/samtools
-picard=/share/apps/genomics/picard-2.26.9/picard.jar
+bowtie=/path/to/bowtie
+samtools=/path/to/samtools
+picard=/path/to/picard
 
 #### AAV2 expression ####
 

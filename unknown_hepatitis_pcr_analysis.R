@@ -6,6 +6,8 @@ library(cowplot)
 library(ggpubr)
 library(janitor)
 
+pcr_data <- "/path/to/data.csv"
+
 # Define thresholds for positive, low-level positive and negative results
 not_detected <- 45 # Max Ct value of the PCR
 thres <- 38 # Ct value above which we count as low-level positive
@@ -32,10 +34,9 @@ pcr_pos <- function(ct, thres, not_detected) {
 pcr_pos <- Vectorize(pcr_pos, vectorize.args = "ct")
 
 #### Import and prepare data ####
-data <- read.csv("pcr_data3.csv") %>%
+data <- read.csv(pcr_data) %>%
   
-  # Set negative PCR results to an arbitrary value above the 
-  # max number of CT cycles for plotting
+  # Set negative PCR results to an arbitrary value above the max number of CT cycles for plotting
   dplyr::mutate(aav2_ct = ifelse(aav2_ct == "ND", 50, aav2_ct),
          adeno_ct = ifelse(adeno_ct == "ND", 50, adeno_ct),
          hhv6_ct = ifelse(hhv6_ct == "ND", 50, hhv6_ct),
